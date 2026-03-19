@@ -65,37 +65,13 @@ async function verificarRadar() {
 
     const apiUrl = "https://info.dengue.mat.br/api/alertcity?geocode=" + geocode + "&disease=dengue&format=json&ew_start=" + ewStart + "&ew_end=" + ewEnd + "&ey_start=" + anoVal + "&ey_end=" + anoVal;
     
-    // Try multiple CORS proxies to avoid 403 errors
-    const corsProxies = [
-        "https://corsproxy.io/?",
-        "https://api.allorigins.win/raw?url=",
-        "https://cors-anywhere.herokuapp.com/"
-    ];
-    
-    let data = null;
-    let lastError = null;
-    
-    for (const proxy of corsProxies) {
-        try {
-            const url = proxy + encodeURIComponent(apiUrl);
-            const resp = await fetch(url);
-            if (resp.ok) {
-                data = await resp.json();
-                break;
-            } else {
-                lastError = `HTTP ${resp.status}`;
-            }
-        } catch (e) {
-            lastError = e.message;
-            continue;
-        }
-           }
-    
-    if (!data) {
-        throw new Error(`Todos os proxies falharam. Último erro: ${lastError}`);
-    }
+    const url = "https://corsproxy.io/?" + encodeURIComponent(apiUrl);
 
     try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error("Erro HTTP " + resp.status);
+        const data = await resp.json();
+
         if (!data || data.length === 0) {
             container.innerHTML = "Nenhum dado encontrado para <strong>" + cidadeNome + "/" + cidadeUF + "</strong> no periodo selecionado. A cidade pode nao estar na base do AlertaDengue.";
             return;
