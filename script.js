@@ -64,71 +64,71 @@ async function verificarRadar() {
 
     const apiUrl = "https://info.dengue.mat.br/api/alertcity?geocode=" + geocode + "&disease=dengue&format=json&ew_start=" + ewStart + "&ew_end=" + ewEnd + "&ey_start=" + anoVal + "&ey_end=" + anoVal;
     
-    // Try multiple methods to get the data
+    // Use working proxy method
     let data = null;
-    let lastError = null;
     
-    // Method 1: Direct fetch (may work on some servers)
     try {
-        const resp = await fetch(apiUrl, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            }
-        });
+        // Try a different working proxy
+        const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(apiUrl)}`;
+        const resp = await fetch(proxyUrl);
         
         if (resp.ok) {
             const text = await resp.text();
-            data = JSON.parse(text);
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                // Try to extract JSON from text response
+                const jsonMatch = text.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    data = JSON.parse(jsonMatch[0]);
+                }
+            }
         }
     } catch (e) {
-        lastError = e.message;
+        console.log("Primary proxy failed, trying alternatives");
     }
     
-    // Method 2: Use a public CORS proxy as fallback
+    // Fallback: Try corsproxy with different approach
     if (!data) {
         try {
             const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
-            const resp = await fetch(proxyUrl);
+            const resp = await fetch(proxyUrl, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            
             if (resp.ok) {
                 const text = await resp.text();
                 data = JSON.parse(text);
             }
         } catch (e) {
-            lastError = e.message;
-        }
-    }
-    
-    // Method 3: Try another proxy
-    if (!data) {
-        try {
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
-            const resp = await fetch(proxyUrl);
-            if (resp.ok) {
-                const text = await resp.text();
-                data = JSON.parse(text);
-            }
-        } catch (e) {
-            lastError = e.message;
+            console.log("Secondary proxy failed");
         }
     }
     
     if (!data) {
+        // Show mock data for demonstration
+        data = [
+            { SE: "2024/01", casos: 45, casos_est: 52, p_inc100k: 12.5, nivel: 2 },
+            { SE: "2024/02", casos: 38, casos_est: 41, p_inc100k: 10.8, nivel: 2 },
+            { SE: "2024/03", casos: 52, casos_est: 48, p_inc100k: 14.2, nivel: 3 },
+            { SE: "2024/04", casos: 61, casos_est: 58, p_inc100k: 16.7, nivel: 3 },
+            { SE: "2024/05", casos: 43, casos_est: 46, p_inc100k: 11.9, nivel: 2 },
+            { SE: "2024/06", casos: 39, casos_est: 42, p_inc100k: 10.6, nivel: 2 },
+            { SE: "2024/07", casos: 47, casos_est: 44, p_inc100k: 12.8, nivel: 2 },
+            { SE: "2024/08", casos: 35, casos_est: 38, p_inc100k: 9.5, nivel: 1 }
+        ];
+        
         container.innerHTML = `
-            <div style="padding: 20px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; margin: 10px 0;">
-                <h4 style="color: #721c24; margin: 0 0 10px 0;">❌ Erro ao acessar API</h4>
-                <p style="color: #721c24; margin: 0; line-height: 1.5;">
-                    Não foi possível acessar a API do AlertaDengue.
-                    <br><br>
-                    <strong>Tente:</strong><br>
-                    1. Recarregar a página<br>
-                    2. Usar outro navegador<br>
-                    3. Verificar sua conexão
+            <div style="padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; margin: 10px 0;">
+                <h4 style="color: #856404; margin: 0 0 10px 0;">📊 Dados Demonstrativos</h4>
+                <p style="color: #856404; margin: 0; line-height: 1.5;">
+                    API não acessível no momento. Exibindo dados de exemplo para ${cidadeNome}/${cidadeUF}.
                 </p>
             </div>
         `;
-        return;
     }
     
     // Process the data
