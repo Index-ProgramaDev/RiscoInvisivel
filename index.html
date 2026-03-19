@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Risco Invisivel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="./style.css">
+    <script src="https://kit.fontawesome.com/bc96f6af50.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+
+    <!-- Navbar -->
+    <nav>
+        <div class="topbar">
+            <h2>RiscoInvisivel</h2>
+            <a href="#">Inicio</a>
+            <a href="#radar">Radar</a>
+            <a href="#fake">Real ou Fake?</a>
+            <a href="#graficos">Graficos</a>
+            <a href="#dicas">Dicas</a>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <div style="position: relative; height: 100vh;">
+        <img src="./mosquito.jpg" alt="Mosquito da dengue" class="heroimg">
+        <h1 class="titulo">RiscoInvisivel</h1>
+        <h2 class="desc">Confira informações sobre o combate à dengue</h2>
+        <button class="RealBTN" onclick="document.getElementById('fake').scrollIntoView({behavior:'smooth'})">Verificador de noticias</button>
+        <button class="RadarBTN" onclick="document.getElementById('radar').scrollIntoView({behavior:'smooth'})">Radar da dengue</button>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+
+        <!-- Radar -->
+        <h2 class="Radar" id="radar">Radar da Dengue</h2>
+
+        <div class="radar-controls">
+            <input type="text" class="Cidade" id="cidadeInput" placeholder="Ex: São Paulo, Recife, Manaus...">
+            <select class="radar-select" id="anoSelect">
+                <option value="2025">2025</option>
+                <option value="2024" selected>2024</option>
+                <option value="2023">2023</option>
+                <option value="2022">2022</option>
+            </select>
+            <select class="radar-select" id="semanaSelect">
+                <option value="1-26">1ª–26ª semana</option>
+                <option value="1-52">Ano completo</option>
+                <option value="27-52">27ª–52ª semana</option>
+            </select>
+            <button class="SendBTN" onclick="verificarRadar()">Verificar</button>
+        </div>
+
+        <div class="ContainerIA" id="containerRadar"></div>
+
+        <!-- Real ou Fake -->
+        <div class="fake-wrapper" id="fake">
+            <h2 class="Real">Real ou Fake?</h2>
+            <p class="fake-subtitle">Cole uma notícia sobre dengue e a IA verifica se é verdadeira ou falsa</p>
+            <div class="fake-input-row">
+                <input type="text" class="Digitar" id="noticiaInput" placeholder="Ex: Vacina da dengue causa autismo...">
+                <button class="EnviarBTN" onclick="verificarNoticia()">Verificar</button>
+            </div>
+            <div class="ContainerFake" id="containerFake"></div>
+        </div>
+
+        <!-- Gráficos -->
+        <h2 class="Graficos" id="graficos">Gráficos</h2>
+        <div class="graficos-container">
+            <canvas id="graficoDengue"></canvas>
+        </div>
+        <p class="graficos-fonte">Fonte: Ministério da Saúde — Incidência por 100 000 hab. até a 26ª Semana Epidemiológica de 2024.</p>
+
+        <!-- Dicas -->
+        <h2 class="dicas-titulo" id="dicas">Dicas</h2>
+        <div class="dicas-wrapper">
+            <div class="Containerdicas">
+                <h2>🪣 Água parada</h2>
+                <p>Elimine recipientes com água parada como baldes, pneus e vasos de plantas. O mosquito se reproduz em qualquer quantidade de água.</p>
+            </div>
+            <div class="Containerdicas">
+                <h2>🦟 Repelente</h2>
+                <p>Use repelente regularmente, especialmente em áreas externas. Prefira os aprovados pela ANVISA e reaplique conforme indicado.</p>
+            </div>
+            <div class="Containerdicas">
+                <h2>🏥 Sintomas</h2>
+                <p>Febre alta, dor no corpo, manchas vermelhas e dor atrás dos olhos são sinais. Procure um médico imediatamente ao identificar.</p>
+            </div>
+            <div class="Containerdicas">
+                <h2>💧 Hidratação</h2>
+                <p>Beba bastante água e líquidos. Evite automedicação, especialmente aspirina e anti-inflamatórios que podem agravar o quadro.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-top-bar"></div>
+        <div class="footer-inner">
+            <div class="footer-grid">
+
+                <div class="footer-brand">
+                    <h3>RiscoInvisivel</h3>
+                    <p>Monitoramento inteligente da dengue no Brasil. Dados reais, verificação de notícias e alertas por cidade.</p>
+                    <div class="footer-social">
+                       
+ 
+<i class="fa-brands fa-facebook"><a href="https://www.instagram.com/index.bernardo_dev/"></a></i>
+<i class="fa-brands fa-instagram"><a href="https://www.instagram.com/index.bernardo_dev/"></a></i>
+ <i class="fa-brands fa-github"><a href="https://github.com/Index-ProgramaDev"></a></i>
+                    </div>
+                </div>
+
+                <div class="footer-col">
+                    <h4>Navegação</h4>
+                    <ul>
+                        <li><a href="#">Início</a></li>
+                        <li><a href="#radar">Radar</a></li>
+                        <li><a href="#fake">Real ou Fake?</a></li>
+                        <li><a href="#graficos">Gráficos</a></li>
+                        <li><a href="#dicas">Dicas</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-col">
+                    <h4>Fontes</h4>
+                    <ul>
+                        <li><a href="https://info.dengue.mat.br" target="_blank">AlertaDengue</a></li>
+                        <li><a href="https://www.gov.br/saude" target="_blank">Min. da Saúde</a></li>
+                        <li><a href="https://servicodados.ibge.gov.br" target="_blank">API IBGE</a></li>
+                        <li><a href="https://www.gov.br/anvisa" target="_blank">ANVISA</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-col">
+                    <h4>Status</h4>
+                    <div class="footer-badge"><span>●</span> AlertaDengue API</div>
+                    <div class="footer-badge"><span>●</span> IBGE API</div>
+                    <div class="footer-badge"><span>●</span> Verificador IA</div>
+                </div>
+
+            </div>
+
+            <div class="footer-bottom">
+                <span>&copy; 2026 RiscoInvisivel. Todos os direitos reservados.</span>
+                <span>Dados: <a href="https://info.dengue.mat.br" target="_blank">AlertaDengue</a> &amp; <a href="https://www.gov.br/saude" target="_blank">Ministério da Saúde</a></span>
+            </div>
+        </div>
+    </footer>
+<script src="./script.js"></script>
+</body>
+</html>
