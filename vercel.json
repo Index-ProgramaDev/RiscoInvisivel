@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "/api/geocode", "destination": "/api/geocode" },
+    { "source": "/api/dengue", "destination": "/api/dengue" },
+    { "source": "/api/noticia", "destination": "/api/noticia" }
+  ]
+}
