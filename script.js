@@ -64,38 +64,112 @@ async function verificarRadar() {
 
     const apiUrl = "https://info.dengue.mat.br/api/alertcity?geocode=" + geocode + "&disease=dengue&format=json&ew_start=" + ewStart + "&ew_end=" + ewEnd + "&ey_start=" + anoVal + "&ey_end=" + anoVal;
     
-    // Try direct request - some browsers may allow it
+    // Try multiple methods to get the data
+    let data = null;
+    let lastError = null;
+    
+    // Method 1: Direct fetch (may work on some servers)
     try {
         const resp = await fetch(apiUrl, {
-            mode: 'no-cors',
+            method: 'GET',
             headers: {
                 'Accept': 'application/json',
+                'Content-Type': 'application/json'
             }
         });
         
-        // If no-cors works, we can't read the response, so we need a different approach
-        throw new Error("Direct request not readable, trying alternative");
-        
+        if (resp.ok) {
+            const text = await resp.text();
+            data = JSON.parse(text);
+        }
     } catch (e) {
-        // Fallback: Use a simple JSONP-like approach or show helpful message
+        lastError = e.message;
+    }
+    
+    // Method 2: Use a public CORS proxy as fallback
+    if (!data) {
+        try {
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
+            const resp = await fetch(proxyUrl);
+            if (resp.ok) {
+                const text = await resp.text();
+                data = JSON.parse(text);
+            }
+        } catch (e) {
+            lastError = e.message;
+        }
+    }
+    
+    // Method 3: Try another proxy
+    if (!data) {
+        try {
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
+            const resp = await fetch(proxyUrl);
+            if (resp.ok) {
+                const text = await resp.text();
+                data = JSON.parse(text);
+            }
+        } catch (e) {
+            lastError = e.message;
+        }
+    }
+    
+    if (!data) {
         container.innerHTML = `
-            <div style="padding: 20px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; margin: 10px 0;">
-                <h4 style="color: #856404; margin: 0 0 10px 0;">⚠️ Restrições de Navegador</h4>
-                <p style="color: #856404; margin: 0; line-height: 1.5;">
-                    O navegador está bloqueando o acesso direto à API do AlertaDengue por segurança (CORS).
+            <div style="padding: 20px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; margin: 10px 0;">
+                <h4 style="color: #721c24; margin: 0 0 10px 0;">❌ Erro ao acessar API</h4>
+                <p style="color: #721c24; margin: 0; line-height: 1.5;">
+                    Não foi possível acessar a API do AlertaDengue.
                     <br><br>
-                    <strong>Soluções:</strong><br>
-                    1. Use um navegador desktop (Chrome/Firefox)<br>
-                    2. Desative temporariamente as configurações de segurança<br>
-                    3. Acesse diretamente: <a href="${apiUrl}" target="_blank" style="color: #007bff;">Ver dados brutos</a>
+                    <strong>Tente:</strong><br>
+                    1. Recarregar a página<br>
+                    2. Usar outro navegador<br>
+                    3. Verificar sua conexão
                 </p>
             </div>
-            <div style="padding: 15px; background: #e7f3ff; border-radius: 8px; margin: 10px 0;">
-                <strong>${cidadeNome}/${cidadeUF}</strong> - Geocode: ${geocode}<br>
-                <small>API URL: ${apiUrl}</small>
-            </div>
         `;
+        return;
     }
+    
+    // Process the data
+    if (!data || data.length === 0) {
+        container.innerHTML = "Nenhum dado encontrado para <strong>" + cidadeNome + "/" + cidadeUF + "</strong> no periodo selecionado. A cidade pode nao estar na base do AlertaDengue.";
+        return;
+    }
+
+    const recentes = data.slice(-8).reverse();
+    const ultimo = recentes[0];
+    const nivelAtual = nivelLabel(ultimo.nivel);
+    const totalCasos = data.reduce((acc, d) => acc + (d.casos || 0), 0);
+
+    let html = '<div class="radar-info">';
+    html += '<strong>' + cidadeNome + '/' + cidadeUF + '</strong>';
+    html += ' &mdash; ' + anoVal + ', semanas ' + ewStart + '&ndash;' + ewEnd + ' &nbsp;|&nbsp; ';
+    html += 'Total: <strong>' + totalCasos.toLocaleString('pt-BR') + ' casos</strong> &nbsp;|&nbsp; ';
+    html += 'Alerta atual: <span class="nivel-badge ' + nivelAtual.classe + '">' + nivelAtual.texto + '</span>';
+    html += '</div>';
+    html += '<table class="radar-table"><thead><tr>';
+    html += '<th>Semana Epi.</th><th>Casos</th><th>Casos Estimados</th><th>Inc. / 100k hab.</th><th>Alerta</th>';
+    html += '</tr></thead><tbody>';
+
+    recentes.forEach(function(item) {
+        const se = String(item.SE || item.se || "");
+        const semana = se.length >= 6 ? se.slice(0,4) + " / SE " + se.slice(4) : se;
+        const casos = (item.casos || 0).toLocaleString('pt-BR');
+        const casosEst = Math.round(item.casos_est || item.casos_estmax || 0).toLocaleString('pt-BR');
+        const inc = (item.p_inc100k || item.inc || 0).toFixed(2);
+        const nivel = nivelLabel(item.nivel);
+        html += '<tr>';
+        html += '<td>' + semana + '</td>';
+        html += '<td>' + casos + '</td>';
+        html += '<td>' + casosEst + '</td>';
+        html += '<td>' + inc + '</td>';
+        html += '<td><span class="nivel-badge ' + nivel.classe + '">' + nivel.texto + '</span></td>';
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
 }
 
 // ── Real ou Fake — Claude API ──
