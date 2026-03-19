@@ -1,4 +1,4 @@
-// ── Busca geocode IBGE dinamicamente (qualquer municipio do Brasil) ──
+// ── Busca geocode IBGE ──
 async function buscarGeocode(nomeCidade) {
     const query = encodeURIComponent(nomeCidade);
     const resp = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios?nome=${query}`);
@@ -27,7 +27,7 @@ function nivelLabel(nivel) {
     return map[nivel] || { texto: "Desconhecido", classe: "nivel-1" };
 }
 
-// ── Radar -- API AlertaDengue ──
+// ── Radar -- API AlertaDengue (pública, direto) ──
 async function verificarRadar() {
     const inputRaw = document.getElementById("cidadeInput").value.trim();
     const anoVal = document.getElementById("anoSelect").value;
@@ -43,97 +43,40 @@ async function verificarRadar() {
         return;
     }
 
-    container.innerHTML = '<span class="loading">Buscando municipio "' + inputRaw + '" na base do IBGE...</span>';
+    container.innerHTML = '<span class="loading">Buscando município "' + inputRaw + '" na base do IBGE...</span>';
 
     let geocode, cidadeNome, cidadeUF;
     try {
         const resultado = await buscarGeocode(inputRaw);
         if (!resultado) {
-            container.innerHTML = 'Cidade <strong>"' + inputRaw + '"</strong> nao encontrada. Verifique o nome e tente novamente.';
+            container.innerHTML = 'Cidade <strong>"' + inputRaw + '"</strong> não encontrada. Verifique o nome e tente novamente.';
             return;
         }
         geocode = resultado.geocode;
         cidadeNome = resultado.nome;
         cidadeUF = resultado.uf;
     } catch(e) {
-        container.innerHTML = "Erro ao buscar o municipio na API do IBGE. Verifique sua conexao.";
+        container.innerHTML = "Erro ao buscar o município na API do IBGE. Verifique sua conexão.";
         return;
     }
 
     container.innerHTML = '<span class="loading">Buscando dados de dengue em ' + cidadeNome + '/' + cidadeUF + '...</span>';
 
-    const apiUrl = "https://info.dengue.mat.br/api/alertcity?geocode=" + geocode + "&disease=dengue&format=json&ew_start=" + ewStart + "&ew_end=" + ewEnd + "&ey_start=" + anoVal + "&ey_end=" + anoVal;
-    
-    // Use working proxy method
     let data = null;
-    
+    const apiUrl = `https://info.dengue.mat.br/api/alertcity?geocode=${geocode}&disease=dengue&format=json&ew_start=${ewStart}&ew_end=${ewEnd}&ey_start=${anoVal}&ey_end=${anoVal}`;
+
     try {
-        // Try a different working proxy
-        const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(apiUrl)}`;
-        const resp = await fetch(proxyUrl);
-        
+        const resp = await fetch(apiUrl);
         if (resp.ok) {
-            const text = await resp.text();
-            try {
-                data = JSON.parse(text);
-            } catch (e) {
-                // Try to extract JSON from text response
-                const jsonMatch = text.match(/\{[\s\S]*\}/);
-                if (jsonMatch) {
-                    data = JSON.parse(jsonMatch[0]);
-                }
-            }
+            data = await resp.json();
+            if (!Array.isArray(data) || data.length === 0) data = null;
         }
-    } catch (e) {
-        console.log("Primary proxy failed, trying alternatives");
+    } catch(e) {
+        console.error("Erro ao consultar AlertaDengue:", e);
     }
-    
-    // Fallback: Try corsproxy with different approach
+
     if (!data) {
-        try {
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
-            const resp = await fetch(proxyUrl, {
-                method: 'GET',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
-            
-            if (resp.ok) {
-                const text = await resp.text();
-                data = JSON.parse(text);
-            }
-        } catch (e) {
-            console.log("Secondary proxy failed");
-        }
-    }
-    
-    if (!data) {
-        // Show mock data for demonstration
-        data = [
-            { SE: "2024/01", casos: 45, casos_est: 52, p_inc100k: 12.5, nivel: 2 },
-            { SE: "2024/02", casos: 38, casos_est: 41, p_inc100k: 10.8, nivel: 2 },
-            { SE: "2024/03", casos: 52, casos_est: 48, p_inc100k: 14.2, nivel: 3 },
-            { SE: "2024/04", casos: 61, casos_est: 58, p_inc100k: 16.7, nivel: 3 },
-            { SE: "2024/05", casos: 43, casos_est: 46, p_inc100k: 11.9, nivel: 2 },
-            { SE: "2024/06", casos: 39, casos_est: 42, p_inc100k: 10.6, nivel: 2 },
-            { SE: "2024/07", casos: 47, casos_est: 44, p_inc100k: 12.8, nivel: 2 },
-            { SE: "2024/08", casos: 35, casos_est: 38, p_inc100k: 9.5, nivel: 1 }
-        ];
-        
-        container.innerHTML = `
-            <div style="padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; margin: 10px 0;">
-                <h4 style="color: #856404; margin: 0 0 10px 0;">📊 Dados Demonstrativos</h4>
-                <p style="color: #856404; margin: 0; line-height: 1.5;">
-                    API não acessível no momento. Exibindo dados de exemplo para ${cidadeNome}/${cidadeUF}.
-                </p>
-            </div>
-        `;
-    }
-    
-    // Process the data
-    if (!data || data.length === 0) {
-        container.innerHTML = "Nenhum dado encontrado para <strong>" + cidadeNome + "/" + cidadeUF + "</strong> no periodo selecionado. A cidade pode nao estar na base do AlertaDengue.";
+        container.innerHTML = `Nenhum dado encontrado para <strong>${cidadeNome}/${cidadeUF}</strong> no período selecionado. A cidade pode não estar na base do AlertaDengue.`;
         return;
     }
 
@@ -172,7 +115,7 @@ async function verificarRadar() {
     container.innerHTML = html;
 }
 
-// ── Real ou Fake — Claude API ──
+// ── Real ou Fake — Claude API via proxy Vercel ──
 async function verificarNoticia() {
     const noticia = document.getElementById('noticiaInput').value.trim();
     if (!noticia) return alert("Digite uma notícia!");
@@ -182,7 +125,7 @@ async function verificarNoticia() {
     container.innerHTML = '<span class="loading">Analisando notícia...</span>';
 
     try {
-        const response = await fetch("https://api.anthropic.com/v1/messages", {
+        const response = await fetch("/api/claude", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
