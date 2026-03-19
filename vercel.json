@@ -1,7 +1,26 @@
 {
-  "rewrites": [
-    { "source": "/api/geocode", "destination": "/api/geocode" },
-    { "source": "/api/dengue", "destination": "/api/dengue" },
-    { "source": "/api/noticia", "destination": "/api/noticia" }
+  "version": 2,
+  "builds": [
+    {
+      "src": "**/*",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        }
+      ]
+    }
   ]
 }
