@@ -64,34 +64,24 @@ async function verificarRadar() {
 
     const apiUrl = "https://info.dengue.mat.br/api/alertcity?geocode=" + geocode + "&disease=dengue&format=json&ew_start=" + ewStart + "&ew_end=" + ewEnd + "&ey_start=" + anoVal + "&ey_end=" + anoVal;
     
-    // Try multiple CORS proxies to avoid 403 errors
-    const corsProxies = [
-        "https://corsproxy.io/?",
-        "https://api.allorigins.win/raw?url=",
-        "https://cors-anywhere.herokuapp.com/"
-    ];
-    
+    // Use Vercel serverless proxy for reliable CORS handling
     let data = null;
     let lastError = null;
     
-    for (const proxy of corsProxies) {
-        try {
-            const url = proxy + encodeURIComponent(apiUrl);
-            const resp = await fetch(url);
-            if (resp.ok) {
-                data = await resp.json();
-                break;
-            } else {
-                lastError = `HTTP ${resp.status}`;
-            }
-        } catch (e) {
-            lastError = e.message;
-            continue;
+    try {
+        const proxyUrl = `/api/proxy?url=${encodeURIComponent(apiUrl)}`;
+        const resp = await fetch(proxyUrl);
+        if (resp.ok) {
+            data = await resp.json();
+        } else {
+            lastError = `HTTP ${resp.status}`;
         }
+    } catch (e) {
+        lastError = e.message;
     }
     
     if (!data) {
-        throw new Error(`Todos os proxies falharam. Último erro: ${lastError}`);
+        throw new Error(`Falha ao buscar dados: ${lastError}`);
     }
 
     try {
