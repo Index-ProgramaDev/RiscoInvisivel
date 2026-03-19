@@ -52,7 +52,8 @@ async function verificarRadar() {
             container.innerHTML = 'Cidade <strong>"' + inputRaw + '"</strong> nao encontrada. Verifique o nome e tente novamente.';
             return;
         }
-        geocode = resultado.geocode;
+
+          geocode = resultado.geocode;
         cidadeNome = resultado.nome;
         cidadeUF = resultado.uf;
     } catch(e) {
@@ -64,24 +65,34 @@ async function verificarRadar() {
 
     const apiUrl = "https://info.dengue.mat.br/api/alertcity?geocode=" + geocode + "&disease=dengue&format=json&ew_start=" + ewStart + "&ew_end=" + ewEnd + "&ey_start=" + anoVal + "&ey_end=" + anoVal;
     
-    // Use Vercel serverless proxy for reliable CORS handling
+    // Try multiple CORS proxies to avoid 403 errors
+    const corsProxies = [
+        "https://corsproxy.io/?",
+        "https://api.allorigins.win/raw?url=",
+        "https://cors-anywhere.herokuapp.com/"
+    ];
+    
     let data = null;
     let lastError = null;
     
-    try {
-        const proxyUrl = `/api/proxy?url=${encodeURIComponent(apiUrl)}`;
-        const resp = await fetch(proxyUrl);
-        if (resp.ok) {
-            data = await resp.json();
-        } else {
-            lastError = `HTTP ${resp.status}`;
+    for (const proxy of corsProxies) {
+        try {
+            const url = proxy + encodeURIComponent(apiUrl);
+            const resp = await fetch(url);
+            if (resp.ok) {
+                data = await resp.json();
+                break;
+            } else {
+                lastError = `HTTP ${resp.status}`;
+            }
+        } catch (e) {
+            lastError = e.message;
+            continue;
         }
-    } catch (e) {
-        lastError = e.message;
-    }
+           }
     
     if (!data) {
-        throw new Error(`Falha ao buscar dados: ${lastError}`);
+        throw new Error(`Todos os proxies falharam. Último erro: ${lastError}`);
     }
 
     try {
@@ -89,8 +100,7 @@ async function verificarRadar() {
             container.innerHTML = "Nenhum dado encontrado para <strong>" + cidadeNome + "/" + cidadeUF + "</strong> no periodo selecionado. A cidade pode nao estar na base do AlertaDengue.";
             return;
         }
-
-        const recentes = data.slice(-8).reverse();
+          const recentes = data.slice(-8).reverse();
         const ultimo = recentes[0];
         const nivelAtual = nivelLabel(ultimo.nivel);
         const totalCasos = data.reduce((acc, d) => acc + (d.casos || 0), 0);
@@ -195,12 +205,12 @@ new Chart(document.getElementById('graficoDengue').getContext('2d'), {
                 color: '#333',
                 padding: { bottom: 16 }
             },
-            tooltip: {
+                       tooltip: {
                 callbacks: {
                     label: ctx => ctx.parsed.y.toLocaleString('pt-BR') + ' casos/100k hab.'
                 }
             }
-        },
+               },
         scales: {
             y: {
                 beginAtZero: true,
@@ -211,7 +221,6 @@ new Chart(document.getElementById('graficoDengue').getContext('2d'), {
         }
     }
 });
-
 // ── Enter nos inputs ──
 document.getElementById('cidadeInput').addEventListener('keydown', e => { if(e.key === 'Enter') verificarRadar(); });
 document.getElementById('noticiaInput').addEventListener('keydown', e => { if(e.key === 'Enter') verificarNoticia(); });
