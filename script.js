@@ -69,7 +69,7 @@ async function verificarRadar() {
     let lastError = null;
     
     try {
-        const proxyUrl = `/api/proxy?url=${encodeURIComponent(apiUrl)}`;
+        const proxyUrl = `/proxy?url=${encodeURIComponent(apiUrl)}`;
         const resp = await fetch(proxyUrl);
         if (resp.ok) {
             data = await resp.json();
