@@ -1,334 +1,154 @@
-// ── Busca geocode IBGE dinamicamente (qualquer municipio do Brasil) ──
 async function buscarGeocode(nomeCidade) {
-    const query = encodeURIComponent(nomeCidade);
-    const resp = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios?nome=${query}`);
-    if (!resp.ok) throw new Error("Erro IBGE");
-    const data = await resp.json();
-    if (!data || data.length === 0) return null;
-    const norm = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const nomeNorm = norm(nomeCidade);
-    const exato = data.find(m => norm(m.nome) === nomeNorm);
-    const resultado = exato || data[0];
-    return {
-        geocode: resultado.id,
-        nome: resultado.nome,
-        uf: resultado.microrregiao.mesorregiao.UF.sigla
-    };
+  const query = encodeURIComponent(nomeCidade);
+  const resp = await fetch(
+    `https://servicodados.ibge.gov.br/api/v1/localidades/municipios?nome=${query}`,
+  );
+  if (!resp.ok) throw new Error("Erro IBGE");
+  const data = await resp.json();
+  if (!data || data.length === 0) return null;
+
+  const norm = (s) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  const nomeNorm = norm(nomeCidade);
+  const exato = data.find((m) => norm(m.nome) === nomeNorm);
+  const resultado = exato || data[0];
+
+  return {
+    geocode: resultado.id,
+    nome: resultado.nome,
+    uf: resultado.microrregiao.mesorregiao.UF.sigla,
+  };
 }
 
-// ── Nivel de alerta ──
 function nivelLabel(nivel) {
-    const map = {
-        1: { texto: "Verde (Baixo)", classe: "nivel-1" },
-        2: { texto: "Amarelo (Medio)", classe: "nivel-2" },
-        3: { texto: "Laranja (Alto)", classe: "nivel-3" },
-        4: { texto: "Vermelho (Muito Alto)", classe: "nivel-4" }
-    };
-    return map[nivel] || { texto: "Desconhecido", classe: "nivel-1" };
+  const map = {
+    1: { texto: "Verde (Baixo)", classe: "nivel-1" },
+    2: { texto: "Amarelo (Medio)", classe: "nivel-2" },
+    3: { texto: "Laranja (Alto)", classe: "nivel-3" },
+    4: { texto: "Vermelho (Muito Alto)", classe: "nivel-4" },
+  };
+  return map[nivel] || { texto: "Desconhecido", classe: "nivel-1" };
 }
-
-// ── Radar -- API AlertaDengue ──
 async function verificarRadar() {
-    const inputRaw = document.getElementById("cidadeInput").value.trim();
-    const anoVal = document.getElementById("anoSelect").value;
-    const semanaVal = document.getElementById("semanaSelect").value;
-    const [ewStart, ewEnd] = semanaVal.split("-");
+  const inputRaw = document.getElementById("cidadeInput").value.trim();
+  const anoVal = document.getElementById("anoSelect").value;
+  const semanaVal = document.getElementById("semanaSelect").value;
+  const [ewStart, ewEnd] = semanaVal.split("-");
+  const container = document.getElementById("containerRadar");
 
-    const container = document.getElementById("containerRadar");
-    container.style.display = "block";
-    container.style.borderLeftColor = "var(--vermelho)";
+  if (!inputRaw) return (container.innerHTML = "Digite uma cidade.");
 
-    if (!inputRaw) {
-        container.innerHTML = "Digite uma cidade para consultar.";
-        return;
+  container.style.display = "block";
+  container.innerHTML = "Processando...";
+
+  try {
+    const cidade = await buscarGeocode(inputRaw);
+    if (!cidade) {
+      container.innerHTML = "Cidade não encontrada.";
+      return;
     }
 
-    container.innerHTML = '<span class="loading">Buscando municipio "' + inputRaw + '" na base do IBGE...</span>';
+    const proxy = "https://api.allorigins.win/raw?url=";
+    const baseApi = `https://info.dengue.mat.br/api/alertcity?geocode=${cidade.geocode}&format=json&ew_start=${ewStart}&ew_end=${ewEnd}&ey_start=${anoVal}&ey_end=${anoVal}`;
 
-    let geocode, cidadeNome, cidadeUF;
-    try {
-        const resultado = await buscarGeocode(inputRaw);
-        if (!resultado) {
-            container.innerHTML = 'Cidade <strong>"' + inputRaw + '"</strong> nao encontrada. Verifique o nome e tente novamente.';
-            return;
-        }
-        geocode = resultado.geocode;
-        cidadeNome = resultado.nome;
-        cidadeUF = resultado.uf;
-    } catch(e) {
-        container.innerHTML = "Erro ao buscar o municipio na API do IBGE. Verifique sua conexao.";
-        return;
-    }
+    const [dadosDengue, dadosChikun] = await Promise.all([
+      fetch(`${proxy}${encodeURIComponent(baseApi + "&disease=dengue")}`).then(
+        (r) => r.json(),
+      ),
+      fetch(
+        `${proxy}${encodeURIComponent(baseApi + "&disease=chikungunya")}`,
+      ).then((r) => r.json()),
+    ]);
 
-    container.innerHTML = '<span class="loading">Buscando dados de dengue em ' + cidadeNome + '/' + cidadeUF + '...</span>';
-
-    const apiUrl = "https://info.dengue.mat.br/api/alertcity?geocode=" + geocode + "&disease=dengue&format=json&ew_start=" + ewStart + "&ew_end=" + ewEnd + "&ey_start=" + anoVal + "&ey_end=" + anoVal;
-    
-    // Force API access using multiple methods
-    let data = null;
-    
-    // Method 1: Use a working CORS proxy with proper headers
-    try {
-        const proxyUrl = `https://cors-anywhere.herokuapp.com/${apiUrl}`;
-        const resp = await fetch(proxyUrl, {
-            method: 'GET',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': 'application/json'
-            }
-        });
-        
-        if (resp.ok) {
-            data = await resp.json();
-        }
-    } catch (e) {
-        console.log("CORS Anywhere failed");
-    }
-    
-    // Method 2: Try with different proxy
-    if (!data) {
-        try {
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
-            const resp = await fetch(proxyUrl, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
-            
-            if (resp.ok) {
-                const text = await resp.text();
-                data = JSON.parse(text);
-            }
-        } catch (e) {
-            console.log("AllOrigins failed");
-        }
-    }
-    
-    // Method 3: Try direct with no-cors (will get opaque response but worth trying)
-    if (!data) {
-        try {
-            const resp = await fetch(apiUrl, {
-                mode: 'no-cors',
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
-            
-            // Can't read no-cors response, but let's try
-            const text = await resp.text();
-            if (text && text.length > 0) {
-                data = JSON.parse(text);
-            }
-        } catch (e) {
-            console.log("No-cors failed");
-        }
-    }
-    
-    // Method 4: Use JSONP approach
-    if (!data) {
-        try {
-            // Create a JSONP request
-            const callbackName = 'jsonp_callback_' + Date.now();
-            const jsonpUrl = `${apiUrl}&callback=${callbackName}`;
-            
-            data = await new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = jsonpUrl;
-                script.onload = () => {
-                    document.head.removeChild(script);
-                    delete window[callbackName];
-                };
-                script.onerror = () => {
-                    document.head.removeChild(script);
-                    delete window[callbackName];
-                    reject(new Error('JSONP failed'));
-                };
-                
-                window[callbackName] = (data) => {
-                    resolve(data);
-                };
-                
-                document.head.appendChild(script);
-                
-                // Timeout after 10 seconds
-                setTimeout(() => {
-                    if (document.head.contains(script)) {
-                        document.head.removeChild(script);
-                        delete window[callbackName];
-                        reject(new Error('JSONP timeout'));
-                    }
-                }, 10000);
-            });
-        } catch (e) {
-            console.log("JSONP failed");
-        }
-    }
-    
-    // If all methods fail, create a working proxy using fetch in a service worker context
-    if (!data) {
-        try {
-            // Use a different approach - fetch through a GitHub raw file that acts as proxy
-            const githubProxyUrl = `https://raw.githubusercontent.com/jeromeetienne/jsonp/master/examples/simple.js?callback=${encodeURIComponent(apiUrl)}`;
-            const resp = await fetch(githubProxyUrl);
-            
-            if (resp.ok) {
-                // This is a hack - we'll use the response to create a working request
-                const text = await resp.text();
-                console.log("GitHub proxy response:", text);
-            }
-        } catch (e) {
-            console.log("GitHub proxy failed");
-        }
-    }
-    
-    // Last resort: Use browser extension approach or show working data
-    if (!data) {
-        // Create data using a working pattern that matches the API structure
-        const baseData = [
-            { SE: "2024/01", casos: Math.floor(Math.random() * 50) + 20, casos_est: Math.floor(Math.random() * 60) + 25, p_inc100k: (Math.random() * 20 + 5).toFixed(1), nivel: Math.floor(Math.random() * 3) + 1 },
-            { SE: "2024/02", casos: Math.floor(Math.random() * 50) + 20, casos_est: Math.floor(Math.random() * 60) + 25, p_inc100k: (Math.random() * 20 + 5).toFixed(1), nivel: Math.floor(Math.random() * 3) + 1 },
-            { SE: "2024/03", casos: Math.floor(Math.random() * 50) + 20, casos_est: Math.floor(Math.random() * 60) + 25, p_inc100k: (Math.random() * 20 + 5).toFixed(1), nivel: Math.floor(Math.random() * 3) + 1 },
-            { SE: "2024/04", casos: Math.floor(Math.random() * 50) + 20, casos_est: Math.floor(Math.random() * 60) + 25, p_inc100k: (Math.random() * 20 + 5).toFixed(1), nivel: Math.floor(Math.random() * 3) + 1 },
-            { SE: "2024/05", casos: Math.floor(Math.random() * 50) + 20, casos_est: Math.floor(Math.random() * 60) + 25, p_inc100k: (Math.random() * 20 + 5).toFixed(1), nivel: Math.floor(Math.random() * 3) + 1 },
-            { SE: "2024/06", casos: Math.floor(Math.random() * 50) + 20, casos_est: Math.floor(Math.random() * 60) + 25, p_inc100k: (Math.random() * 20 + 5).toFixed(1), nivel: Math.floor(Math.random() * 3) + 1 },
-            { SE: "2024/07", casos: Math.floor(Math.random() * 50) + 20, casos_est: Math.floor(Math.random() * 60) + 25, p_inc100k: (Math.random() * 20 + 5).toFixed(1), nivel: Math.floor(Math.random() * 3) + 1 },
-            { SE: "2024/08", casos: Math.floor(Math.random() * 50) + 20, casos_est: Math.floor(Math.random() * 60) + 25, p_inc100k: (Math.random() * 20 + 5).toFixed(1), nivel: Math.floor(Math.random() * 3) + 1 }
-        ];
-        
-        data = baseData;
-        
-        // Add a small note that this is simulated data
-        container.innerHTML = `
-            <div style="padding: 10px; background: #e8f5e8; border: 1px solid #c3e6c3; border-radius: 8px; margin: 10px 0; font-size: 12px; color: #2d5a2d;">
-                📊 Dados simulados para demonstração - estrutura real da API
-            </div>
-        `;
-    }
-    
-    // Process the data
-    if (!data || data.length === 0) {
-        container.innerHTML = "Nenhum dado encontrado para <strong>" + cidadeNome + "/" + cidadeUF + "</strong> no periodo selecionado. A cidade pode nao estar na base do AlertaDengue.";
-        return;
-    }
-
-    const recentes = data.slice(-8).reverse();
-    const ultimo = recentes[0];
-    const nivelAtual = nivelLabel(ultimo.nivel);
-    const totalCasos = data.reduce((acc, d) => acc + (d.casos || 0), 0);
-
-    let html = '<div class="radar-info">';
-    html += '<strong>' + cidadeNome + '/' + cidadeUF + '</strong>';
-    html += ' &mdash; ' + anoVal + ', semanas ' + ewStart + '&ndash;' + ewEnd + ' &nbsp;|&nbsp; ';
-    html += 'Total: <strong>' + totalCasos.toLocaleString('pt-BR') + ' casos</strong> &nbsp;|&nbsp; ';
-    html += 'Alerta atual: <span class="nivel-badge ' + nivelAtual.classe + '">' + nivelAtual.texto + '</span>';
-    html += '</div>';
-    html += '<table class="radar-table"><thead><tr>';
-    html += '<th>Semana Epi.</th><th>Casos</th><th>Casos Estimados</th><th>Inc. / 100k hab.</th><th>Alerta</th>';
-    html += '</tr></thead><tbody>';
-
-    recentes.forEach(function(item) {
-        const se = String(item.SE || item.se || "");
-        const semana = se.length >= 6 ? se.slice(0,4) + " / SE " + se.slice(4) : se;
-        const casos = (item.casos || 0).toLocaleString('pt-BR');
-        const casosEst = Math.round(item.casos_est || item.casos_estmax || 0).toLocaleString('pt-BR');
-        const inc = (item.p_inc100k || item.inc || 0).toFixed(2);
-        const nivel = nivelLabel(item.nivel);
-        html += '<tr>';
-        html += '<td>' + semana + '</td>';
-        html += '<td>' + casos + '</td>';
-        html += '<td>' + casosEst + '</td>';
-        html += '<td>' + inc + '</td>';
-        html += '<td><span class="nivel-badge ' + nivel.classe + '">' + nivel.texto + '</span></td>';
-        html += '</tr>';
-    });
-
-    html += '</tbody></table>';
-    container.innerHTML = html;
+    exibirResultados(cidade, dadosDengue, dadosChikun);
+  } catch (error) {
+    console.error(error);
+    container.innerHTML = "Erro na comunicação com as APIs.";
+  }
 }
 
-// ── Real ou Fake — Claude API ──
+function exibirResultados(cidade, dengue, chikun) {
+  const container = document.getElementById("containerRadar");
+  const ultDengue = dengue?.[0] || { casos: 0, nivel: 1 };
+  const nivel = nivelLabel(ultDengue.nivel);
+
+  container.innerHTML = `
+    <strong>${cidade.nome}/${cidade.uf}</strong><br>
+    <div class="resumo-cards">
+      <div class="card ${nivel.classe}">
+        <strong>Dengue</strong><br>
+        Casos: ${ultDengue.casos}<br>
+        Status: ${nivel.texto}
+      </div>
+    </div>
+  `;
+}
 async function verificarNoticia() {
-    const noticia = document.getElementById('noticiaInput').value.trim();
-    if (!noticia) return alert("Digite uma notícia!");
+  const noticia = document.getElementById("noticiaInput").value.trim();
+  if (!noticia) return alert("Digite uma notícia!");
 
-    const container = document.getElementById('containerFake');
-    container.style.display = 'block';
-    container.innerHTML = '<span class="loading">Analisando notícia...</span>';
+  const container = document.getElementById("containerFake");
+  container.style.display = "block";
+  container.innerHTML = "Analisando...";
 
-    try {
-        const response = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                model: "claude-sonnet-4-20250514",
-                max_tokens: 1000,
-                messages: [{
-                    role: "user",
-                    content: `Você é um verificador de fatos especializado em saúde e dengue. Analise a seguinte afirmação ou notícia e diga se é REAL ou FAKE, com uma breve explicação. Comece com "✅ REAL" ou "❌ FAKE" e explique em 2-3 frases. Notícia: "${noticia}". Responda em português.`
-                }]
-            })
-        });
-        const data = await response.json();
-        const resposta = data.content.map(i => i.text || "").join("\n");
-        container.innerHTML = resposta.replace(/\n/g, '<br>');
-    } catch(e) {
-        container.innerHTML = 'Erro ao consultar. Verifique sua conexão.';
-    }
+  try {
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization:
+            "Bearer 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",
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-oss-120b",
+          messages: [
+            {
+              role: "user",
+              content: `Você é um verificador de fatos sobre dengue. Responda se é REAL ou FAKE e explique brevemente. Notícia: "${noticia}, Tire as formatações quero um texto seco."`,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 1200,
+        }),
+      },
+    );
+
+    const data = await response.json();
+    const resposta = data.choices?.[0]?.message?.content || "Sem resposta";
+
+    container.innerHTML = resposta.replace(/\n/g, "<br>");
+  } catch {
+    container.innerHTML = "Erro ao consultar IA.";
+  }
 }
 
-// ── Gráfico ──
-const regioes = ['Sudeste', 'Sul', 'Centro-Oeste', 'Nordeste', 'Norte'];
+const regioes = ["Sudeste", "Sul", "Centro-Oeste", "Nordeste", "Norte"];
 const incidencia = [4739.8, 3949.0, 3894.1, 600.1, 284.2];
-const cores = [
-    'rgba(211,47,47,0.85)',
-    'rgba(230,81,0,0.85)',
-    'rgba(249,168,37,0.85)',
-    'rgba(30,136,229,0.85)',
-    'rgba(56,142,60,0.85)'
-];
 
-new Chart(document.getElementById('graficoDengue').getContext('2d'), {
-    type: 'bar',
-    data: {
-        labels: regioes,
-        datasets: [{
-            label: 'Casos por 100 000 hab.',
-            data: incidencia,
-            backgroundColor: cores,
-            borderColor: cores.map(c => c.replace('0.85','1')),
-            borderWidth: 1,
-            borderRadius: 8
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: { display: false },
-            title: {
-                display: true,
-                text: 'Incidência de Dengue por Região — Brasil 2024 (até SE 26)',
-                font: { size: 14, family: 'DM Sans' },
-                color: '#333',
-                padding: { bottom: 16 }
-            },
-            tooltip: {
-                callbacks: {
-                    label: ctx => ctx.parsed.y.toLocaleString('pt-BR') + ' casos/100k hab.'
-                }
-            }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                title: { display: true, text: 'Casos por 100 000 hab.', font: { family: 'DM Sans' } },
-                grid: { color: 'rgba(0,0,0,0.06)' }
-            },
-            x: { grid: { display: false } }
-        }
-    }
+new Chart(document.getElementById("graficoDengue"), {
+  type: "bar",
+  data: {
+    labels: regioes,
+    datasets: [
+      {
+        label: "Casos por 100k",
+        data: incidencia,
+        backgroundColor: ["red", "orange", "yellow", "blue", "green"],
+      },
+    ],
+  },
 });
 
-// ── Enter nos inputs ──
-document.getElementById('cidadeInput').addEventListener('keydown', e => { if(e.key === 'Enter') verificarRadar(); });
-document.getElementById('noticiaInput').addEventListener('keydown', e => { if(e.key === 'Enter') verificarNoticia(); });
+document.getElementById("cidadeInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") verificarRadar();
+});
+
+document.getElementById("noticiaInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") verificarNoticia();
+});
