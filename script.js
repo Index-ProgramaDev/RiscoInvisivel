@@ -103,7 +103,7 @@ async function verificarNoticia() {
         headers: {
           "Content-Type": "application/json",
           Authorization:
-            "Bearer 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",
+            "Bearer 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",
         },
         body: JSON.stringify({
           model: "openai/gpt-oss-120b",
