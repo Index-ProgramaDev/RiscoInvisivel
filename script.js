@@ -95,33 +95,37 @@ async function verificarNoticia() {
   container.style.display = "block";
   container.innerHTML = "Analisando...";
 
-    const API_KEY = "AQ.Ab8RN6JNz2t7Qlk3Clhk4JGH-y-zPGIsJH6y7Kb5k_WMkUjEaQ";
-  try {
-    const response = await fetch(
-         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization:
-            "Bearer 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",
-        },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [
+   const API_KEY = "AQ.Ab8RN6JNz2t7Qlk3Clhk4JGH-y-zPGIsJH6y7Kb5k_WMkUjEaQ"
+
+const response = await fetch(
+  `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [
             {
-              role: "user",
-              content: `Você é um verificador de fatos sobre dengue. Responda se é REAL ou FAKE e explique brevemente. Notícia: "${noticia}, Tire as formatações quero um texto seco."`,
+              text: `Você é um verificador de fatos sobre dengue. Responda se é REAL ou FAKE e explique brevemente. Notícia: "${noticia}". Texto seco.`,
             },
           ],
-          temperature: 0.7,
-          max_tokens: 1200,
-        }),
+        },
+      ],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 1200,
       },
-    );
+    }),
+  }
+);
 
-    const data = await response.json();
-    const resposta = data.choices?.[0]?.message?.content || "Sem resposta";
+const data = await response.json();
+const resposta =
+  data.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resposta";
 
     container.innerHTML = resposta.replace(/\n/g, "<br>");
   } catch {
