@@ -95,9 +95,10 @@ async function verificarNoticia() {
   container.style.display = "block";
   container.innerHTML = "Analisando...";
 
+    const API_KEY = "AQ.Ab8RN6JNz2t7Qlk3Clhk4JGH-y-zPGIsJH6y7Kb5k_WMkUjEaQ";
   try {
     const response = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
+         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
       {
         method: "POST",
         headers: {
